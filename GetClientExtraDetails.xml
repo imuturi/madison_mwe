@@ -1,0 +1,114 @@
+
+<sequence name="GetClientExtraDetails" xmlns="http://ws.apache.org/ns/synapse">
+
+    <!-- Log incoming request -->
+    <log level="custom">
+        <property name="FLOW" value="GET_CLIENT_EXTRA_DETAILS"/>
+        <property name="MESSAGE" value="Retrieving client extra details"/>
+    </log>
+
+    <!-- Extract request parameters -->
+    <property name="PRP_CODE"
+              expression="json-eval($.prpCode)"
+              scope="default"
+              type="STRING"/>
+
+    <property name="CED_CODE"
+              expression="json-eval($.cedCode)"
+              scope="default"
+              type="STRING"/>
+
+    <!-- Validate mandatory PRP_CODE -->
+    <filter source="get-property('PRP_CODE')" regex="^$">
+        <then>
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "status": "ERROR",
+                        "message": "prpCode is required",
+                        "data": []
+                    }
+                </format>
+                <args/>
+            </payloadFactory>
+
+            <property name="HTTP_SC"
+                      value="400"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <property name="messageType"
+                      value="application/json"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <respond/>
+        </then>
+    </filter>
+
+    <!-- Log parameters -->
+    <log level="custom">
+        <property name="PRP_CODE"
+                  expression="get-property('PRP_CODE')"/>
+        <property name="CED_CODE"
+                  expression="get-property('CED_CODE')"/>
+    </log>
+
+    <!-- Execute Oracle query using Java Class Mediator -->
+    <class name="org.com.ClientExtraDetailsMediator">
+
+		<property name="jdbcUrl"
+				  value="jdbc:oracle:thin:@//10.10.10.20:1521/ORCL"/>
+
+		<!-- Actual Oracle database login -->
+		<property name="dbUsername"
+				  value="lms_user"/>
+
+		<property name="dbPassword"
+				  value="YOUR_PASSWORD"/>
+
+		<!-- Oracle package application username -->
+		<property name="dbApplicationUsername"
+				  value="ADMIN"/>
+
+		<property name="queryTimeoutSeconds"
+				  value="30"/>
+
+	</class>
+
+    <!-- Retrieve mediator result -->
+    <property name="CLIENT_EXTRA_DETAILS_RESPONSE"
+              expression="get-property('CLIENT_EXTRA_DETAILS')"
+              scope="default"
+              type="STRING"/>
+
+    <!-- Log result count -->
+    <log level="custom">
+        <property name="RESULT_COUNT"
+                  expression="get-property('CLIENT_EXTRA_DETAILS_COUNT')"/>
+    </log>
+
+    <!-- Set JSON response -->
+    <payloadFactory media-type="json">
+        <format>
+            $1
+        </format>
+        <args>
+            <arg evaluator="xml"
+                 expression="get-property('CLIENT_EXTRA_DETAILS_RESPONSE')"/>
+        </args>
+    </payloadFactory>
+
+    <property name="messageType"
+              value="application/json"
+              scope="axis2"
+              type="STRING"/>
+
+    <property name="HTTP_SC"
+              value="200"
+              scope="axis2"
+              type="STRING"/>
+
+    <respond/>
+
+</sequence>

@@ -1,0 +1,125 @@
+<sequence xmlns="http://ws.apache.org/ns/synapse"
+          name="check-existing-ri-trans">
+
+    <!-- Extract product code from JSON request -->
+    <property name="prodCode"
+              expression="json-eval($.prodCode)"
+              scope="default"
+              type="STRING"/>
+
+    <!-- Set Oracle package username -->
+    <property name="DB_USERNAME"
+              value="ADMIN"
+              scope="default"
+              type="STRING"/>
+
+    <!-- Validate product code -->
+    <filter xpath="string-length(normalize-space(get-property('prodCode'))) > 0">
+
+        <then>
+
+            <!-- Execute Oracle function -->
+            <dblookup>
+                <connection>
+                    <pool>
+                        <driver>oracle.jdbc.OracleDriver</driver>
+                        <url>jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE</url>
+                        <user>TQ_LMS</user>
+                        <password>YOUR_DB_PASSWORD</password>
+                    </pool>
+                </connection>
+
+                <statement>
+                    <sql><![CDATA[
+                        SELECT TQ_LMS.CHECK_EXISTING_RI_TRANS_ADMIN(?)
+                        AS RESULT
+                        FROM DUAL
+                    ]]></sql>
+
+                    <parameter expression="get-property('prodCode')"
+                               type="NUMERIC"/>
+
+                    <result name="existingRiTransaction"
+                            column="RESULT"/>
+                </statement>
+            </dblookup>
+
+            <!-- Log execution details -->
+            <log level="custom">
+                <property name="DATABASE_USERNAME"
+                          expression="get-property('DB_USERNAME')"/>
+                <property name="PRODUCT_CODE"
+                          expression="get-property('prodCode')"/>
+                <property name="RESULT"
+                          expression="get-property('existingRiTransaction')"/>
+            </log>
+
+            <!-- Construct JSON response -->
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "success": true,
+                        "prodCode": "$1",
+                        "username": "$2",
+                        "existingRiTransaction": "$3",
+                        "hasExistingRiTransaction": $4
+                    }
+                </format>
+                <args>
+                    <arg evaluator="xml"
+                         expression="get-property('prodCode')"/>
+
+                    <arg evaluator="xml"
+                         expression="get-property('DB_USERNAME')"/>
+
+                    <arg evaluator="xml"
+                         expression="get-property('existingRiTransaction')"/>
+
+                    <arg evaluator="xml"
+                         expression="boolean(get-property('existingRiTransaction') = 'Y')"/>
+                </args>
+            </payloadFactory>
+
+            <property name="HTTP_SC"
+                      value="200"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <property name="messageType"
+                      value="application/json"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <respond/>
+
+        </then>
+
+        <else>
+
+            <property name="HTTP_SC"
+                      value="400"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "success": false,
+                        "message": "prodCode is required"
+                    }
+                </format>
+                <args/>
+            </payloadFactory>
+
+            <property name="messageType"
+                      value="application/json"
+                      scope="axis2"
+                      type="STRING"/>
+
+            <respond/>
+
+        </else>
+
+    </filter>
+
+</sequence>

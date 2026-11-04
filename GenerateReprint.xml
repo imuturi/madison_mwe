@@ -1,0 +1,110 @@
+<sequence xmlns="http://ws.apache.org/ns/synapse"
+          name="generate-reprint">
+
+    <!-- Extract batch report number -->
+    <property name="btrCode"
+              expression="json-eval($.btrCode)"
+              scope="default"
+              type="STRING"/>
+
+    <!-- Validate input -->
+    <filter xpath="string-length(normalize-space(get-property('btrCode'))) > 0">
+
+        <then>
+
+            <!-- Initialize Oracle package global username -->
+            <dbreport>
+                <connection>
+                    <pool>
+                        <driver>oracle.jdbc.OracleDriver</driver>
+                        <url>jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE</url>
+                        <user>TQ_LMS</user>
+                        <password>YOUR_DB_PASSWORD</password>
+                    </pool>
+                </connection>
+
+                <statement>
+                    <sql><![CDATA[
+                        BEGIN
+                            pkg_global_vars.pvg_username := 'ADMIN';
+                        END;
+                    ]]></sql>
+                </statement>
+            </dbreport>
+
+            <!-- Execute Oracle stored procedure -->
+            <dbreport>
+                <connection>
+                    <pool>
+                        <driver>oracle.jdbc.OracleDriver</driver>
+                        <url>jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE</url>
+                        <user>TQ_LMS</user>
+                        <password>YOUR_DB_PASSWORD</password>
+                    </pool>
+                </connection>
+
+                <statement>
+                    <sql><![CDATA[
+                        { call TQ_LMS.LMS_WEB_PKG.GENERATEREPRINT(?) }
+                    ]]></sql>
+
+                    <parameter expression="get-property('btrCode')"
+                               type="NUMERIC"/>
+                </statement>
+            </dbreport>
+
+            <!-- Success response -->
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "success": true,
+                        "message": "Reprint generated successfully",
+                        "btrCode": "$1",
+                        "username": "ADMIN"
+                    }
+                </format>
+                <args>
+                    <arg evaluator="xml"
+                         expression="get-property('btrCode')"/>
+                </args>
+            </payloadFactory>
+
+            <property name="HTTP_SC"
+                      value="200"
+                      scope="axis2"/>
+
+            <property name="messageType"
+                      value="application/json"
+                      scope="axis2"/>
+
+            <respond/>
+
+        </then>
+
+        <else>
+
+            <property name="HTTP_SC"
+                      value="400"
+                      scope="axis2"/>
+
+            <payloadFactory media-type="json">
+                <format>
+                    {
+                        "success": false,
+                        "message": "btrCode is required"
+                    }
+                </format>
+                <args/>
+            </payloadFactory>
+
+            <property name="messageType"
+                      value="application/json"
+                      scope="axis2"/>
+
+            <respond/>
+
+        </else>
+
+    </filter>
+
+</sequence>
