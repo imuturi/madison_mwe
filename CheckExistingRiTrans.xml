@@ -31,7 +31,7 @@
 
                 <statement>
                     <sql><![CDATA[
-                        SELECT TQ_LMS.CHECK_EXISTING_RI_TRANS_ADMIN(?)
+                        SELECT TQ_LMS.LMS_WEB_PKG.CHECK_EXISTING_RI_TRANS(?)
                         AS RESULT
                         FROM DUAL
                     ]]></sql>

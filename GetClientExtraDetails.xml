@@ -55,26 +55,40 @@
     </log>
 
     <!-- Execute Oracle query using Java Class Mediator -->
+    
     <class name="org.com.ClientExtraDetailsMediator">
 
-		<property name="jdbcUrl"
-				  value="jdbc:oracle:thin:@//10.10.10.20:1521/ORCL"/>
+        <property name="jdbcUrl"
+                value="jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE"/>
 
-		<!-- Actual Oracle database login -->
-		<property name="dbUsername"
-				  value="lms_user"/>
+        <property name="dbUsername"
+                value="TQ_LMS"/>
 
-		<property name="dbPassword"
-				  value="YOUR_PASSWORD"/>
+        <property name="dbPassword"
+                value="YOUR_DB_PASSWORD"/>
 
-		<!-- Oracle package application username -->
-		<property name="dbApplicationUsername"
-				  value="ADMIN"/>
+        <property name="dbApplicationUsername"
+                value="ADMIN"/>
 
-		<property name="queryTimeoutSeconds"
-				  value="30"/>
+        <!-- Package containing the application username variable -->
+        <property name="usernamePackage"
+                value="TQ_LMS.PKG_GLOBAL_VARS"/>
 
-	</class>
+        <property name="usernameVariable"
+                value="PVG_USERNAME"/>
+
+        <!-- Package containing CLIENTEXTRADTLS -->
+        <property name="procedurePackage"
+                value="TQ_LMS.LMS_CLIENTS_CURSOR"/>
+
+        <property name="procedureName"
+                value="CLIENTEXTRADTLS"/>
+
+        <property name="queryTimeoutSeconds"
+                value="30"/>
+
+    </class>
+
 
     <!-- Retrieve mediator result -->
     <property name="CLIENT_EXTRA_DETAILS_RESPONSE"

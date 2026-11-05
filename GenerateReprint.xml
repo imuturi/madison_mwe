@@ -1,36 +1,23 @@
-<sequence xmlns="http://ws.apache.org/ns/synapse"
-          name="generate-reprint">
 
-    <!-- Extract batch report number -->
-    <property name="btrCode"
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence xmlns="http://ws.apache.org/ns/synapse"
+          name="GenerateReprintSequence">
+
+    <log level="custom">
+        <property name="API" value="GenerateReprint"/>
+        <property name="MESSAGE" value="Starting reprint generation"/>
+    </log>
+
+    <!-- Extract request parameter -->
+    <property name="BTR_CODE"
               expression="json-eval($.btrCode)"
               scope="default"
               type="STRING"/>
 
-    <!-- Validate input -->
-    <filter xpath="string-length(normalize-space(get-property('btrCode'))) > 0">
+    <!-- Validate batch report code -->
+    <filter source="get-property('BTR_CODE')" regex="^[0-9]+$">
 
         <then>
-
-            <!-- Initialize Oracle package global username -->
-            <dbreport>
-                <connection>
-                    <pool>
-                        <driver>oracle.jdbc.OracleDriver</driver>
-                        <url>jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE</url>
-                        <user>TQ_LMS</user>
-                        <password>YOUR_DB_PASSWORD</password>
-                    </pool>
-                </connection>
-
-                <statement>
-                    <sql><![CDATA[
-                        BEGIN
-                            pkg_global_vars.pvg_username := 'ADMIN';
-                        END;
-                    ]]></sql>
-                </statement>
-            </dbreport>
 
             <!-- Execute Oracle stored procedure -->
             <dbreport>
@@ -44,38 +31,34 @@
                 </connection>
 
                 <statement>
-                    <sql><![CDATA[
-                        { call TQ_LMS.LMS_WEB_PKG.GENERATEREPRINT(?) }
-                    ]]></sql>
+                    <sql>
+                        BEGIN
+                            TQ_LMS.LMS_WEB_PKG.GENERATEREPRINT(?);
+                        END;
+                    </sql>
 
-                    <parameter expression="get-property('btrCode')"
+                    <parameter expression="get-property('BTR_CODE')"
                                type="NUMERIC"/>
                 </statement>
             </dbreport>
 
-            <!-- Success response -->
+            <!-- Successful response -->
             <payloadFactory media-type="json">
                 <format>
                     {
                         "success": true,
                         "message": "Reprint generated successfully",
-                        "btrCode": "$1",
-                        "username": "ADMIN"
+                        "btrCode": "$1"
                     }
                 </format>
+
                 <args>
                     <arg evaluator="xml"
-                         expression="get-property('btrCode')"/>
+                         expression="get-property('BTR_CODE')"/>
                 </args>
             </payloadFactory>
 
-            <property name="HTTP_SC"
-                      value="200"
-                      scope="axis2"/>
-
-            <property name="messageType"
-                      value="application/json"
-                      scope="axis2"/>
+            <property name="HTTP_SC" value="200" scope="axis2"/>
 
             <respond/>
 
@@ -83,23 +66,17 @@
 
         <else>
 
-            <property name="HTTP_SC"
-                      value="400"
-                      scope="axis2"/>
+            <property name="HTTP_SC" value="400" scope="axis2"/>
 
             <payloadFactory media-type="json">
                 <format>
                     {
                         "success": false,
-                        "message": "btrCode is required"
+                        "message": "Invalid or missing btrCode"
                     }
                 </format>
                 <args/>
             </payloadFactory>
-
-            <property name="messageType"
-                      value="application/json"
-                      scope="axis2"/>
 
             <respond/>
 
