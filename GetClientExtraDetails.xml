@@ -1,115 +1,119 @@
 
-<sequence name="GetClientExtraDetails" xmlns="http://ws.apache.org/ns/synapse">
+<?xml version="1.0" encoding="UTF-8"?>
+<sequence name="GetClientExtraDetails"
+          xmlns="http://ws.apache.org/ns/synapse">
 
-    <!-- Log incoming request -->
+    <!-- Start -->
     <log level="custom">
-        <property name="FLOW" value="GET_CLIENT_EXTRA_DETAILS"/>
-        <property name="MESSAGE" value="Retrieving client extra details"/>
+        <property name="FLOW"
+                  value="GET_CLIENT_EXTRA_DETAILS"/>
+        <property name="MESSAGE"
+                  value="Retrieving client extra details"/>
     </log>
 
-    <!-- Extract request parameters -->
+    <!-- Extract request parameter -->
     <property name="PRP_CODE"
               expression="json-eval($.prpCode)"
               scope="default"
               type="STRING"/>
 
-    <property name="CED_CODE"
-              expression="json-eval($.cedCode)"
-              scope="default"
-              type="STRING"/>
+    <log level="custom">
+        <property name="PRP_CODE"
+                  expression="get-property('PRP_CODE')"/>
+    </log>
 
-    <!-- Validate mandatory PRP_CODE -->
-    <filter source="get-property('PRP_CODE')" regex="^$">
+    <!-- Validate PRP_CODE -->
+    <filter source="boolean(get-property('PRP_CODE'))"
+            regex="false">
         <then>
+            <property name="HTTP_SC"
+                      value="400"
+                      scope="axis2"
+                      type="INTEGER"/>
+
             <payloadFactory media-type="json">
                 <format>
                     {
-                        "status": "ERROR",
-                        "message": "prpCode is required",
-                        "data": []
+                      "status": "ERROR",
+                      "message": "prpCode is required"
                     }
                 </format>
                 <args/>
             </payloadFactory>
-
-            <property name="HTTP_SC"
-                      value="400"
-                      scope="axis2"
-                      type="STRING"/>
-
-            <property name="messageType"
-                      value="application/json"
-                      scope="axis2"
-                      type="STRING"/>
-
             <respond/>
         </then>
     </filter>
 
-    <!-- Log parameters -->
-    <log level="custom">
-        <property name="PRP_CODE"
-                  expression="get-property('PRP_CODE')"/>
-        <property name="CED_CODE"
-                  expression="get-property('CED_CODE')"/>
+    <!-- Execute Oracle query -->
+    <dblookup>
+        <connection>
+            <pool>
+                <driver>oracle.jdbc.OracleDriver</driver>
+                <url>jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE</url>
+                <user>TQ_LMS</user>
+                <password>YOUR_DB_PASSWORD</password>
+            </pool>
+        </connection>
+
+        <statement>
+            <sql><![CDATA[
+                SELECT NVL(
+                    JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'CED_CODE' VALUE CED.CED_CODE,
+                            'CED_MCD_CODE' VALUE CED.CED_MCD_CODE,
+                            'CED_PRP_CODE' VALUE CED.CED_PRP_CODE,
+                            'MCD_DESCRIPTION' VALUE MCD.MCD_DESCRIPTION,
+                            'CED_VALUE' VALUE CED.CED_VALUE,
+                            'MCD_CODE' VALUE MCD.MCD_CODE,
+                            'MCD_TYPE' VALUE MCD.MCD_TYPE,
+                            'MCD_INPUT_TYPE' VALUE MCD.MCD_INPUT_TYPE,
+                            'MCD_INPUT_PROMPT' VALUE MCD.MCD_INPUT_PROMPT,
+                            'MCD_QUERY' VALUE MCD.MCD_QUERY
+                            RETURNING CLOB
+                        )
+                        RETURNING CLOB
+                    ),
+                    '[]'
+                )
+                FROM TQ_LMS.LMS_CLIENT_EXTRA_DTLS CED
+                INNER JOIN TQ_LMS.LMS_MANDATORY_CLIENT_DTLS MCD
+                    ON MCD.MCD_CODE = CED.CED_MCD_CODE
+                WHERE CED.CED_PRP_CODE = ?
+            ]]></sql>
+
+            <parameter expression="get-property('PRP_CODE')"
+                       type="NUMERIC"/>
+
+            <result name="CLIENT_EXTRA_DETAILS_RAW"
+                    column="1"/>
+        </statement>
+    </dblookup>
+
+    <!-- Log database result -->
+    <log level="full">
+        <property name="DATABASE_QUERY"
+                  value="EXECUTED"/>
+        <property name="DATABASE_RESULT"
+                  expression="boolean(get-property('CLIENT_EXTRA_DETAILS_RAW'))"/>
     </log>
 
-    <!-- Execute Oracle query using Java Class Mediator -->
-    
-    <class name="org.com.ClientExtraDetailsMediator">
+    <!-- Process result using Java -->
+    <class name="org.com.ClientExtraDetailsMediator"/>
 
-        <property name="jdbcUrl"
-                value="jdbc:oracle:thin:@//192.168.0.28:1521/TQLIVE"/>
-
-        <property name="dbUsername"
-                value="TQ_LMS"/>
-
-        <property name="dbPassword"
-                value="YOUR_DB_PASSWORD"/>
-
-        <property name="dbApplicationUsername"
-                value="ADMIN"/>
-
-        <!-- Package containing the application username variable -->
-        <property name="usernamePackage"
-                value="TQ_LMS.PKG_GLOBAL_VARS"/>
-
-        <property name="usernameVariable"
-                value="PVG_USERNAME"/>
-
-        <!-- Package containing CLIENTEXTRADTLS -->
-        <property name="procedurePackage"
-                value="TQ_LMS.LMS_CLIENTS_CURSOR"/>
-
-        <property name="procedureName"
-                value="CLIENTEXTRADTLS"/>
-
-        <property name="queryTimeoutSeconds"
-                value="30"/>
-
-    </class>
-
-
-    <!-- Retrieve mediator result -->
-    <property name="CLIENT_EXTRA_DETAILS_RESPONSE"
-              expression="get-property('CLIENT_EXTRA_DETAILS')"
-              scope="default"
-              type="STRING"/>
-
-    <!-- Log result count -->
+    <!-- Log response count -->
     <log level="custom">
-        <property name="RESULT_COUNT"
+        <property name="STATUS" value="SUCCESS"/>
+        <property name="RECORD_COUNT"
                   expression="get-property('CLIENT_EXTRA_DETAILS_COUNT')"/>
     </log>
 
-    <!-- Set JSON response -->
+    <!-- Return response -->
     <payloadFactory media-type="json">
-        <format>
-            $1
-        </format>
+        <format>$1</format>
         <args>
             <arg evaluator="xml"
-                 expression="get-property('CLIENT_EXTRA_DETAILS_RESPONSE')"/>
+                 expression="get-property('CLIENT_EXTRA_DETAILS')"/>
         </args>
     </payloadFactory>
 
@@ -121,7 +125,7 @@
     <property name="HTTP_SC"
               value="200"
               scope="axis2"
-              type="STRING"/>
+              type="INTEGER"/>
 
     <respond/>
 
